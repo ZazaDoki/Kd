@@ -14,12 +14,13 @@ Csak kliens oldali, vizuális cooldown jelzők a hotbar fölött.
 | Nyúlláb (Lökés) | jobb klikk | 15 mp |
 
 Config menü: **K** billentyű (Beállítások → Irányítás alatt átállítható).
+A menüben a **Kártyák mozgatása** gombbal az egérrel bárhová húzhatók a jelzők (az **Alaphelyzet** gomb visszaállítja őket).
 Fájl: `.minecraft/config/cooldowntracker.json`
 
 ## Build
 1. Ellenőrizd a verziókat a `gradle.properties`-ben: https://fabricmc.net/develop
 2. Másold be a Gradle wrappert (gradlew, gradlew.bat, gradle/wrapper/) a hivatalos Fabric example mod sablonból
-3. `./gradlew build` -> `build/libs/cooldowntracker-1.0.0.jar`
+3. `./gradlew build` -> `build/libs/cooldowntracker-1.1.0.jar`
 
 ### Gyors build (Windows: `gradlew.bat build`)
-Java 21 szükséges. A kész mod: `build/libs/cooldowntracker-1.0.0.jar` (a `-sources` jar nem kell) -> `.minecraft/mods/`. Fabric API is kell mellé.
+Java 21 szükséges. A kész mod: `build/libs/cooldowntracker-1.1.0.jar` (a `-sources` jar nem kell) -> `.minecraft/mods/`. Fabric API is kell mellé.

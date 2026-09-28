@@ -10,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ConfigScreen extends Screen {
+    private static final int TOP = 36;   // első sor y pozíciója
+    private static final int ROW = 22;   // sorok közti távolság
+
     private final Screen parent;
     private final List<ModConfig.Entry> entries = ModConfig.get().entries;
     private final List<TextFieldWidget> secFields = new ArrayList<>();
@@ -30,7 +33,7 @@ public class ConfigScreen extends Screen {
         secFields.clear();
         ModConfig cfg = ModConfig.get();
         int left = this.width / 2 - 150;
-        int y = 32;
+        int y = TOP;
 
         // globális kapcsoló
         addDrawableChild(ButtonWidget.builder(Text.literal("Mod: ").append(onOff(cfg.enabled)), b -> {
@@ -43,7 +46,7 @@ public class ConfigScreen extends Screen {
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Törlés"), b -> CooldownManager.clear())
                 .dimensions(left + 205, y, 95, 20).build());
-        y += 28;
+        y += 26;
 
         for (ModConfig.Entry e : entries) {
             final ModConfig.Entry entry = e;
@@ -57,7 +60,7 @@ public class ConfigScreen extends Screen {
             f.setText(trim(entry.seconds));
             addDrawableChild(f);
             secFields.add(f);
-            y += 24;
+            y += ROW;
         }
 
         y += 6;
@@ -65,16 +68,21 @@ public class ConfigScreen extends Screen {
         yField.setTextPredicate(s -> s.matches("-?[0-9]{0,3}"));
         yField.setText(String.valueOf(cfg.yOffset));
         addDrawableChild(yField);
-        y += 24;
+        y += ROW;
 
         perRowField = new TextFieldWidget(this.textRenderer, left + 200, y, 50, 20, Text.literal("Row"));
         perRowField.setTextPredicate(s -> s.matches("[0-9]{0,2}"));
         perRowField.setText(String.valueOf(cfg.maxPerRow));
         addDrawableChild(perRowField);
-        y += 30;
+        y += 28;
+
+        addDrawableChild(ButtonWidget.builder(Text.literal("Kártyák mozgatása"), b -> {
+            applyFields(); // a beírt értékek ne vesszenek el
+            this.client.setScreen(new MoveScreen(this));
+        }).dimensions(left, y, 147, 20).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Mentés és kilépés"), b -> close())
-                .dimensions(this.width / 2 - 100, y, 200, 20).build());
+                .dimensions(left + 153, y, 147, 20).build());
     }
 
     private static String trim(double d) {
@@ -84,24 +92,25 @@ public class ConfigScreen extends Screen {
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         super.render(ctx, mouseX, mouseY, delta);
-        ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 14, 0xFFFFFFFF);
+        ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 8, 0xFFFFFFFF);
+        ctx.drawCenteredTextWithShadow(this.textRenderer, "Készítette: FeherHollo69", this.width / 2, 20, 0xFFFFD166);
 
         int left = this.width / 2 - 150;
-        int y = 32 + 28;
+        int y = TOP + 26;
         for (int i = 0; i < entries.size(); i++) {
             ModConfig.Entry e = entries.get(i);
             ctx.drawTextWithShadow(this.textRenderer, e.label, left, y + 6, 0xFF000000 | e.color);
             ctx.drawTextWithShadow(this.textRenderer, "mp", left + 254, y + 6, 0xFFAAAAAA);
-            y += 24;
+            y += ROW;
         }
         y += 6;
         ctx.drawTextWithShadow(this.textRenderer, "Y eltolás (fel +)", left, y + 6, 0xFFFFFFFF);
-        y += 24;
+        y += ROW;
         ctx.drawTextWithShadow(this.textRenderer, "Max jelző soronként", left, y + 6, 0xFFFFFFFF);
     }
 
-    @Override
-    public void close() {
+    /** A beviteli mezők értékeit átírja a configba és elmenti. */
+    private void applyFields() {
         ModConfig cfg = ModConfig.get();
         for (int i = 0; i < entries.size(); i++) {
             try {
@@ -112,6 +121,11 @@ public class ConfigScreen extends Screen {
         try { cfg.yOffset = Integer.parseInt(yField.getText()); } catch (NumberFormatException ignored) {}
         try { cfg.maxPerRow = Math.max(1, Math.min(10, Integer.parseInt(perRowField.getText()))); } catch (NumberFormatException ignored) {}
         ModConfig.save();
+    }
+
+    @Override
+    public void close() {
+        applyFields();
         this.client.setScreen(parent);
     }
 }

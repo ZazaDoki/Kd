@@ -9,16 +9,52 @@ import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CooldownHud {
-    private static final int W = 100;   // kártya szélesség
-    private static final int H = 26;    // kártya magasság
-    private static final int GAP = 4;   // kártyák közti távolság
+    public static final int W = 100;   // kártya szélesség
+    public static final int H = 26;    // kártya magasság
+    public static final int GAP = 4;   // kártyák közti távolság
+
+    /** Az el nem mozgatott kártyák automatikus elrendezése (a hotbar fölött, középen). */
+    public static Map<ModConfig.Entry, int[]> autoLayout(List<ModConfig.Entry> list, int sw, int sh, ModConfig cfg) {
+        Map<ModConfig.Entry, int[]> out = new HashMap<>();
+        List<ModConfig.Entry> auto = new ArrayList<>();
+        for (ModConfig.Entry e : list) if (!e.moved) auto.add(e);
+
+        int perRow = Math.max(1, cfg.maxPerRow);
+        int baseY = sh - 72 - cfg.yOffset; // a hotbar + életerő/éhség/XP sáv fölött
+
+        for (int i = 0; i < auto.size(); i += perRow) {
+            int inRow = Math.min(perRow, auto.size() - i);
+            int rowIndex = i / perRow;
+            int rowW = inRow * W + (inRow - 1) * GAP;
+            int startX = (sw - rowW) / 2;
+            int y = baseY - (rowIndex + 1) * H - rowIndex * GAP;
+            for (int j = 0; j < inRow; j++) {
+                out.put(auto.get(i + j), new int[]{startX + j * (W + GAP), y});
+            }
+        }
+        return out;
+    }
+
+    /** Egy kártya végleges helye: kézzel mozgatott vagy automatikus. */
+    public static int[] position(ModConfig.Entry e, Map<ModConfig.Entry, int[]> auto, int sw, int sh) {
+        if (e.moved) {
+            int x = Math.max(0, Math.min(sw / 2 + e.posX, Math.max(0, sw - W)));
+            int y = Math.max(0, Math.min(sh + e.posY, Math.max(0, sh - H)));
+            return new int[]{x, y};
+        }
+        int[] p = auto.get(e);
+        return p != null ? p : new int[]{0, 0};
+    }
 
     public static void render(DrawContext ctx, MinecraftClient mc) {
         ModConfig cfg = ModConfig.get();
         if (!cfg.enabled || mc.options.hudHidden || mc.player == null) return;
+        if (mc.currentScreen instanceof MoveScreen) return; // ott a MoveScreen rajzolja a kártyákat
 
         List<ModConfig.Entry> active = new ArrayList<>();
         for (ModConfig.Entry e : cfg.entries) {
@@ -27,30 +63,20 @@ public class CooldownHud {
         if (active.isEmpty()) return;
 
         TextRenderer tr = mc.textRenderer;
-        int perRow = Math.max(1, cfg.maxPerRow);
         int sw = ctx.getScaledWindowWidth();
         int sh = ctx.getScaledWindowHeight();
+        Map<ModConfig.Entry, int[]> auto = autoLayout(active, sw, sh, cfg);
 
-        // A hotbar + életerő/éhség/XP sáv fölött
-        int baseY = sh - 72 - cfg.yOffset;
-
-        for (int i = 0; i < active.size(); i += perRow) {
-            int inRow = Math.min(perRow, active.size() - i);
-            int rowIndex = i / perRow;
-            int rowW = inRow * W + (inRow - 1) * GAP;
-            int startX = (sw - rowW) / 2;
-            int y = baseY - (rowIndex + 1) * H - rowIndex * GAP;
-
-            for (int j = 0; j < inRow; j++) {
-                drawCard(ctx, tr, active.get(i + j), startX + j * (W + GAP), y);
-            }
+        for (ModConfig.Entry e : active) {
+            int[] p = position(e, auto, sw, sh);
+            drawCard(ctx, tr, e, p[0], p[1],
+                    CooldownManager.remainingMs(e.id),
+                    Math.max(1, CooldownManager.totalMs(e.id)));
         }
     }
 
-    private static void drawCard(DrawContext ctx, TextRenderer tr, ModConfig.Entry e, int x, int y) {
-        long rem = CooldownManager.remainingMs(e.id);
-        long total = Math.max(1, CooldownManager.totalMs(e.id));
-        float frac = Math.min(1f, rem / (float) total);
+    public static void drawCard(DrawContext ctx, TextRenderer tr, ModConfig.Entry e, int x, int y, long rem, long total) {
+        float frac = Math.min(1f, rem / (float) Math.max(1, total));
         int accent = 0xFF000000 | e.color;
 
         // háttér + keret
@@ -76,7 +102,7 @@ public class CooldownHud {
         ctx.fill(barX1, barY1, barX1 + filled, barY2, accent);
     }
 
-    private static final java.util.Map<String, ItemStack> CACHE = new java.util.HashMap<>();
+    private static final Map<String, ItemStack> CACHE = new HashMap<>();
 
     private static ItemStack getStack(String id) {
         return CACHE.computeIfAbsent(id, k -> {

@@ -32,6 +32,12 @@ public class ModConfig {
         public int color;            // RGB
         public String nameContains;  // üres = bármilyen nevű item; egyébként a név tartalmazza (kis/nagybetű mindegy)
         public boolean enabled = true;
+        /** true = a felhasználó kézzel elmozgatta, ilyenkor a posX/posY számít. */
+        public boolean moved = false;
+        /** Vízszintes helyzet a képernyő közepéhez képest. */
+        public int posX = 0;
+        /** Függőleges helyzet a képernyő aljához képest (negatív = feljebb). */
+        public int posY = 0;
 
         public Entry() {}
 
@@ -52,6 +58,14 @@ public class ModConfig {
         l.add(new Entry("freeze",    "Fagyasztás",     "minecraft:ice",          "HIT", 120, 0x8BE9FD, "Fagyaszt"));
         l.add(new Entry("push",      "Lökés",          "minecraft:rabbit_foot",  "USE", 15,  0x9AFF6B, "Lökés"));
         return l;
+    }
+
+    public static void resetPositions() {
+        for (Entry e : get().entries) {
+            e.moved = false;
+            e.posX = 0;
+            e.posY = 0;
+        }
     }
 
     public static ModConfig get() {
