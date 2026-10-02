@@ -21,6 +21,10 @@ public class ModConfig {
     public int yOffset = 0;
     /** Egy sorban legfeljebb ennyi jelző van, utána új sor kezdődik felfelé. */
     public int maxPerRow = 4;
+    /** Boss időzítők (a /boss parancs válaszából) be/ki. */
+    public boolean bossEnabled = true;
+    /** Ennyi másodpercenként küldi el magától a /boss parancsot. */
+    public int bossIntervalSec = 60;
     public List<Entry> entries = defaults();
 
     public static class Entry {
@@ -32,6 +36,10 @@ public class ModConfig {
         public int color;            // RGB
         public String nameContains;  // üres = bármilyen nevű item; egyébként a név tartalmazza (kis/nagybetű mindegy)
         public boolean enabled = true;
+        /** true = boss kártya, az idejét a /boss parancs válaszából olvassa. */
+        public boolean boss = false;
+        /** A boss neve úgy, ahogy a /boss válaszában szerepel. */
+        public String bossName = "";
         /** true = a felhasználó kézzel elmozgatta, ilyenkor a posX/posY számít. */
         public boolean moved = false;
         /** Vízszintes helyzet a képernyő közepéhez képest. */
@@ -40,6 +48,11 @@ public class ModConfig {
         public int posY = 0;
 
         public Entry() {}
+
+        /** Látható-e a kártya a HUD-on / mozgatáskor. */
+        public boolean visible(ModConfig cfg) {
+            return enabled && (!boss || cfg.bossEnabled);
+        }
 
         public Entry(String id, String label, String item, String trigger, double seconds, int color, String nameContains) {
             this.id = id; this.label = label; this.item = item; this.trigger = trigger;
@@ -57,7 +70,17 @@ public class ModConfig {
         l.add(new Entry("pearl_hate","Gyöngy Gyűlölő", "minecraft:purple_dye",   "HIT", 120, 0xC77DFF, "Gyöngy"));
         l.add(new Entry("freeze",    "Fagyasztás",     "minecraft:ice",          "HIT", 120, 0x8BE9FD, "Fagyaszt"));
         l.add(new Entry("push",      "Lökés",          "minecraft:rabbit_foot",  "USE", 15,  0x9AFF6B, "Lökés"));
+        l.add(boss("boss_world", "World Boss", "minecraft:wither_skeleton_skull", 0xFF5555, "World Boss"));
+        l.add(boss("boss_lich",  "Lich King",  "minecraft:skeleton_skull",        0x9D7BFF, "Lich King"));
+        l.add(boss("boss_oog",   "Oog",        "minecraft:zombie_head",           0xFFAA00, "Oog"));
         return l;
+    }
+
+    private static Entry boss(String id, String label, String item, int color, String bossName) {
+        Entry e = new Entry(id, label, item, "BOSS", 600, color, "");
+        e.boss = true;
+        e.bossName = bossName;
+        return e;
     }
 
     public static void resetPositions() {
@@ -84,6 +107,13 @@ public class ModConfig {
             System.err.println("[CooldownTracker] Config betöltési hiba: " + e);
         }
         if (instance == null || instance.entries == null) instance = new ModConfig();
+        // régi configból hiányzó (új) kártyák pótlása
+        for (Entry d : defaults()) {
+            boolean found = false;
+            for (Entry e : instance.entries) if (d.id.equals(e.id)) { found = true; break; }
+            if (!found) instance.entries.add(d);
+        }
+        if (instance.bossIntervalSec < 15) instance.bossIntervalSec = 15;
         save();
     }
 

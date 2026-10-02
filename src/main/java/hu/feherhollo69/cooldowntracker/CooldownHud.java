@@ -58,7 +58,7 @@ public class CooldownHud {
 
         List<ModConfig.Entry> active = new ArrayList<>();
         for (ModConfig.Entry e : cfg.entries) {
-            if (e.enabled && CooldownManager.isActive(e.id)) active.add(e);
+            if (e.visible(cfg) && CooldownManager.isActive(e.id)) active.add(e);
         }
         if (active.isEmpty()) return;
 
@@ -76,7 +76,7 @@ public class CooldownHud {
     }
 
     public static void drawCard(DrawContext ctx, TextRenderer tr, ModConfig.Entry e, int x, int y, long rem, long total) {
-        float frac = Math.min(1f, rem / (float) Math.max(1, total));
+        float frac = (e.boss && rem <= 0) ? 1f : Math.min(1f, rem / (float) Math.max(1, total));
         int accent = 0xFF000000 | e.color;
 
         // háttér + keret
@@ -92,8 +92,11 @@ public class CooldownHud {
         // felirat + idő
         String label = tr.trimToWidth(e.label, W - 28);
         ctx.drawText(tr, label, x + 25, y + 5, accent, true);
+        boolean spawned = e.boss && rem <= 0;
         boolean urgent = rem < 3000;
-        ctx.drawText(tr, formatTime(rem), x + 25, y + 15, urgent ? 0xFFFF5555 : 0xFFFFFFFF, true);
+        String timeText = spawned ? "Spawnolt!" : formatTime(rem);
+        int timeColor = spawned ? 0xFF55FF55 : (urgent ? 0xFFFF5555 : 0xFFFFFFFF);
+        ctx.drawText(tr, timeText, x + 25, y + 15, timeColor, true);
 
         // progress bar alul
         int barX1 = x + 1, barX2 = x + W - 1, barY1 = y + H - 3, barY2 = y + H - 1;
@@ -113,6 +116,10 @@ public class CooldownHud {
     }
 
     private static String formatTime(long ms) {
+        if (ms >= 3_600_000) {
+            long s = (ms + 999) / 1000;
+            return String.format("%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60);
+        }
         if (ms >= 60_000) {
             long s = (ms + 999) / 1000;
             return String.format("%d:%02d", s / 60, s % 60);

@@ -1,5 +1,6 @@
 package hu.feherhollo69.cooldowntracker;
 
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -14,8 +15,6 @@ public class MoveScreen extends Screen {
     private final Screen parent;
     private ModConfig.Entry dragging;
     private int grabX, grabY;
-    // true-ról indul, hogy a "Kártyák mozgatása" gomb kattintása ne fogjon meg kártyát
-    private boolean wasDown = true;
 
     public MoveScreen(Screen parent) {
         super(Text.literal("Kártyák mozgatása"));
@@ -39,41 +38,73 @@ public class MoveScreen extends Screen {
         return Math.max(0, Math.min(v, Math.max(0, max)));
     }
 
+    private List<ModConfig.Entry> visibleEntries() {
+        ModConfig cfg = ModConfig.get();
+        List<ModConfig.Entry> list = new ArrayList<>();
+        for (ModConfig.Entry e : cfg.entries) if (e.visible(cfg)) list.add(e);
+        return list;
+    }
+
+    @Override
+    public boolean mouseClicked(Click click, boolean doubled) {
+        // előbb a gombok (Alaphelyzet / Kész)
+        if (super.mouseClicked(click, doubled)) return true;
+        if (click.button() != 0) return false;
+
+        ModConfig cfg = ModConfig.get();
+        int sw = this.width, sh = this.height;
+        List<ModConfig.Entry> list = visibleEntries();
+        Map<ModConfig.Entry, int[]> auto = CooldownHud.autoLayout(list, sw, sh, cfg);
+        double mx = click.x(), my = click.y();
+        for (int i = list.size() - 1; i >= 0; i--) {
+            ModConfig.Entry e = list.get(i);
+            int[] p = CooldownHud.position(e, auto, sw, sh);
+            if (mx >= p[0] && mx < p[0] + CooldownHud.W && my >= p[1] && my < p[1] + CooldownHud.H) {
+                dragging = e;
+                grabX = (int) (mx - p[0]);
+                grabY = (int) (my - p[1]);
+                // a kártya innentől kézi pozíciót kap az aktuális helyén
+                e.moved = true;
+                e.posX = p[0] - sw / 2;
+                e.posY = p[1] - sh;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+        if (dragging != null && click.button() == 0) {
+            int sw = this.width, sh = this.height;
+            int x = clamp((int) (click.x() - grabX), sw - CooldownHud.W);
+            int y = clamp((int) (click.y() - grabY), sh - CooldownHud.H);
+            dragging.moved = true;
+            dragging.posX = x - sw / 2;
+            dragging.posY = y - sh;
+            return true;
+        }
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        if (dragging != null && click.button() == 0) {
+            dragging = null;
+            ModConfig.save();
+            return true;
+        }
+        return super.mouseReleased(click);
+    }
+
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         ModConfig cfg = ModConfig.get();
         int sw = ctx.getScaledWindowWidth();
         int sh = ctx.getScaledWindowHeight();
 
-        List<ModConfig.Entry> list = new ArrayList<>();
-        for (ModConfig.Entry e : cfg.entries) if (e.enabled) list.add(e);
+        List<ModConfig.Entry> list = visibleEntries();
         Map<ModConfig.Entry, int[]> auto = CooldownHud.autoLayout(list, sw, sh, cfg);
-
-        // egér állapot: lenyomás -> megfogás, húzás -> mozgatás, felengedés -> elengedés
-        boolean down = this.client.mouse.wasLeftButtonClicked();
-        if (down && !wasDown) {
-            for (int i = list.size() - 1; i >= 0; i--) {
-                ModConfig.Entry e = list.get(i);
-                int[] p = CooldownHud.position(e, auto, sw, sh);
-                if (mouseX >= p[0] && mouseX < p[0] + CooldownHud.W
-                        && mouseY >= p[1] && mouseY < p[1] + CooldownHud.H) {
-                    dragging = e;
-                    grabX = mouseX - p[0];
-                    grabY = mouseY - p[1];
-                    break;
-                }
-            }
-        } else if (down && dragging != null) {
-            int x = clamp(mouseX - grabX, sw - CooldownHud.W);
-            int y = clamp(mouseY - grabY, sh - CooldownHud.H);
-            dragging.moved = true;
-            dragging.posX = x - sw / 2;
-            dragging.posY = y - sh;
-            auto = CooldownHud.autoLayout(list, sw, sh, cfg); // a többi kártya újrarendeződhet
-        } else if (!down) {
-            dragging = null;
-        }
-        wasDown = down;
 
         // kártyák (mintha 60%-ig lennének kitöltve)
         for (ModConfig.Entry e : list) {

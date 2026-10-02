@@ -14,7 +14,7 @@ public class ConfigScreen extends Screen {
     private static final int ROW = 22;   // sorok közti távolság
 
     private final Screen parent;
-    private final List<ModConfig.Entry> entries = ModConfig.get().entries;
+    private final List<ModConfig.Entry> entries = new ArrayList<>();
     private final List<TextFieldWidget> secFields = new ArrayList<>();
     private TextFieldWidget yField;
     private TextFieldWidget perRowField;
@@ -31,21 +31,28 @@ public class ConfigScreen extends Screen {
     @Override
     protected void init() {
         secFields.clear();
+        entries.clear();
         ModConfig cfg = ModConfig.get();
+        for (ModConfig.Entry e : cfg.entries) if (!e.boss) entries.add(e); // a boss kártyák külön kapcsolóval vannak
         int left = this.width / 2 - 150;
         int y = TOP;
 
-        // globális kapcsoló
+        // felső sor: 4 gomb
         addDrawableChild(ButtonWidget.builder(Text.literal("Mod: ").append(onOff(cfg.enabled)), b -> {
             cfg.enabled = !cfg.enabled;
             b.setMessage(Text.literal("Mod: ").append(onOff(cfg.enabled)));
-        }).dimensions(left, y, 100, 20).build());
+        }).dimensions(left, y, 72, 20).build());
+
+        addDrawableChild(ButtonWidget.builder(Text.literal("Boss: ").append(onOff(cfg.bossEnabled)), b -> {
+            cfg.bossEnabled = !cfg.bossEnabled;
+            b.setMessage(Text.literal("Boss: ").append(onOff(cfg.bossEnabled)));
+        }).dimensions(left + 76, y, 72, 20).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Előnézet"), b -> CooldownManager.startAllPreview())
-                .dimensions(left + 105, y, 95, 20).build());
+                .dimensions(left + 152, y, 72, 20).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Törlés"), b -> CooldownManager.clear())
-                .dimensions(left + 205, y, 95, 20).build());
+                .dimensions(left + 228, y, 72, 20).build());
         y += 26;
 
         for (ModConfig.Entry e : entries) {
