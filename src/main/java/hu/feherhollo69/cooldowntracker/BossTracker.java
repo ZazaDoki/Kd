@@ -31,6 +31,15 @@ public class BossTracker {
         ModConfig cfg = ModConfig.get();
         if (!cfg.enabled || !cfg.bossEnabled || text == null) return true;
 
+        // a saját /boss lekérdezésünk ideje alatt a díszítő sorokat (----, ▬▬▬, üres sor) is elrejtjük
+        if (System.currentTimeMillis() < suppressUntil) {
+            boolean hasContent = false;
+            for (int i = 0; i < text.length(); i++) {
+                if (Character.isLetterOrDigit(text.charAt(i))) { hasContent = true; break; }
+            }
+            if (!hasContent) return false;
+        }
+
         boolean relevant = false;
         boolean parsed = false;
         String lower = text.toLowerCase(Locale.ROOT);
