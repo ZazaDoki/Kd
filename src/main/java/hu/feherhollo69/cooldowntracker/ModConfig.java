@@ -36,6 +36,10 @@ public class ModConfig {
         public int color;            // RGB
         public String nameContains;  // üres = bármilyen nevű item; egyébként a név tartalmazza (kis/nagybetű mindegy)
         public boolean enabled = true;
+        /** EFFECT trigger esetén: a figyelt hatás azonosítója (pl. minecraft:strength). */
+        public String effect = "";
+        /** EFFECT trigger esetén: a hatás szintje - 1 = II, 2 = III. */
+        public int amplifier = 0;
         /** true = boss kártya, az idejét a /boss parancs válaszából olvassa. */
         public boolean boss = false;
         /** A boss neve úgy, ahogy a /boss válaszában szerepel. */
@@ -54,6 +58,14 @@ public class ModConfig {
             return enabled && (!boss || cfg.bossEnabled);
         }
 
+        /** Rajtad lévő hatás figyelése (trigger = EFFECT). */
+        public Entry effect(String effectId, int amplifier) {
+            this.effect = effectId; this.amplifier = amplifier;
+            return this;
+        }
+
+        public boolean isEffect() { return "EFFECT".equalsIgnoreCase(trigger); }
+
         public Entry(String id, String label, String item, String trigger, double seconds, int color, String nameContains) {
             this.id = id; this.label = label; this.item = item; this.trigger = trigger;
             this.seconds = seconds; this.color = color; this.nameContains = nameContains;
@@ -64,8 +76,12 @@ public class ModConfig {
         List<Entry> l = new ArrayList<>();
         l.add(new Entry("pearl",     "Ender Pearl",    "minecraft:ender_pearl",  "USE", 9,   0x3DDC97, ""));
         l.add(new Entry("ice_axe",   "Jég Balta",      "minecraft:diamond_axe",  "HIT", 10,  0x55FFFF, "Balta"));
-        l.add(new Entry("speed",     "Gyorsaság II",   "minecraft:sugar",        "USE", 30,  0x7DD3FC, "Gyorsaság"));
-        l.add(new Entry("strength",  "Erő II",         "minecraft:blaze_powder", "USE", 30,  0xFF5555, "Erő"));
+        // a Gyorsaság / Erő kártyák a rajtad lévő hatás hátralévő idejét mutatják
+        l.add(new Entry("speed",     "Gyorsaság II",   "minecraft:sugar",        "EFFECT", 30, 0x7DD3FC, "").effect("minecraft:speed", 1));
+        l.add(new Entry("strength",  "Erő II",         "minecraft:blaze_powder", "EFFECT", 30, 0xFF5555, "").effect("minecraft:strength", 1));
+        l.add(new Entry("strength3", "Erő III",        "minecraft:magma_cream",  "EFFECT", 30, 0xFF2D55, "").effect("minecraft:strength", 2));
+        // horgászbot: akkor indul, amikor kidobod, majd visszahúzod
+        l.add(new Entry("grapple",   "Grappling Hook", "minecraft:fishing_rod",  "REEL", 8,  0x5EEAD4, "Grappling"));
         l.add(new Entry("bamboozle", "Bamboozle",      "minecraft:blaze_rod",    "HIT", 90,  0xFFAA00, "Bamboozle"));
         l.add(new Entry("pearl_hate","Gyöngy Gyűlölő", "minecraft:purple_dye",   "HIT", 120, 0xC77DFF, "Gyöngy"));
         l.add(new Entry("freeze",    "Fagyasztás",     "minecraft:ice",          "HIT", 120, 0x8BE9FD, "Fagyaszt"));
@@ -112,6 +128,15 @@ public class ModConfig {
             boolean found = false;
             for (Entry e : instance.entries) if (d.id.equals(e.id)) { found = true; break; }
             if (!found) instance.entries.add(d);
+        }
+        // régi configban a Gyorsaság/Erő még item-használatra indult: átállítás a hatás figyelésére
+        for (Entry d : defaults()) {
+            if (!d.isEffect()) continue;
+            for (Entry e : instance.entries) {
+                if (d.id.equals(e.id) && !e.isEffect()) {
+                    e.trigger = d.trigger; e.effect = d.effect; e.amplifier = d.amplifier;
+                }
+            }
         }
         if (instance.bossIntervalSec < 15) instance.bossIntervalSec = 15;
         save();

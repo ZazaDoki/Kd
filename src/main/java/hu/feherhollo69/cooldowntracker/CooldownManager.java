@@ -1,6 +1,7 @@
 package hu.feherhollo69.cooldowntracker;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.sound.SoundEvent;
@@ -22,6 +23,9 @@ public class CooldownManager {
     /** Boss id-k, amelyek visszaszámlálása fut, és a lejáratkor jelezni kell. */
     private static final Set<String> PENDING = new HashSet<>();
 
+    /** Effekt kártya id -> eddig tart az előnézet (addig nem írja felül a valódi hatás). */
+    private static final Map<String, Long> PREVIEW = new HashMap<>();
+
     public static final long SPAWNED_SHOW_MS = 30_000;
 
     public static void handle(ItemStack stack, String trigger) {
@@ -31,8 +35,15 @@ public class CooldownManager {
         String itemId = Registries.ITEM.getId(stack.getItem()).toString();
         String name = stack.getName().getString().toLowerCase(Locale.ROOT);
 
+        // REEL: jobb klikk, amikor már ki van dobva a horgászbot (azaz visszahúzod)
+        MinecraftClient mc = MinecraftClient.getInstance();
+        boolean reeling = "USE".equals(trigger) && mc.player != null && mc.player.fishHook != null;
+
         for (ModConfig.Entry e : cfg.entries) {
-            if (!e.enabled || !e.trigger.equalsIgnoreCase(trigger) || !e.item.equals(itemId)) continue;
+            if (!e.enabled || e.isEffect() || !e.item.equals(itemId)) continue;
+            boolean match = e.trigger.equalsIgnoreCase(trigger)
+                    || (reeling && e.trigger.equalsIgnoreCase("REEL"));
+            if (!match) continue;
             if (e.nameContains != null && !e.nameContains.isBlank()
                     && !name.contains(e.nameContains.toLowerCase(Locale.ROOT))) continue;
             start(e, false);
@@ -66,6 +77,7 @@ public class CooldownManager {
 
     /** Minden kliens tick-ben hívódik: észleli, ha egy boss ideje lejárt. */
     public static void tick(MinecraftClient mc) {
+        tickEffects(mc);
         if (PENDING.isEmpty()) return;
         long now = System.currentTimeMillis();
         for (String id : new ArrayList<>(PENDING)) {
@@ -75,6 +87,40 @@ public class CooldownManager {
                 SPAWNED.put(id, now);
                 playSpawnSound(mc);
             }
+        }
+    }
+
+    /** A rajtad lévő hatásokból frissíti az EFFECT kártyákat (pl. Erő II / III, Gyorsaság II). */
+    private static void tickEffects(MinecraftClient mc) {
+        long now = System.currentTimeMillis();
+        for (ModConfig.Entry e : ModConfig.get().entries) {
+            if (!e.isEffect() || e.effect == null || e.effect.isBlank()) continue;
+
+            Long pv = PREVIEW.get(e.id);
+            if (pv != null) {
+                if (now < pv) continue;
+                PREVIEW.remove(e.id);
+                END.remove(e.id);
+            }
+
+            long ticks = -1;
+            Identifier id = Identifier.tryParse(e.effect);
+            if (mc.player != null && id != null) {
+                for (StatusEffectInstance inst : mc.player.getStatusEffects()) {
+                    if (inst.getEffectType().matchesId(id)
+                            && inst.getAmplifier() == e.amplifier
+                            && !inst.isInfinite()) {
+                        ticks = inst.getDuration();
+                        break;
+                    }
+                }
+            }
+
+            if (ticks <= 0) { END.remove(e.id); continue; }
+            long ms = ticks * 50L;
+            long prev = remainingMs(e.id);
+            END.put(e.id, now + ms);
+            if (prev <= 0 || ms > prev + 1000) TOTAL.put(e.id, ms); // új vagy meghosszabbított hatás
         }
     }
 
@@ -91,6 +137,11 @@ public class CooldownManager {
                 TOTAL.put(e.id, 15_000L);
                 SPAWNED.remove(e.id);
                 PENDING.add(e.id);
+            } else if (e.isEffect()) {
+                long now = System.currentTimeMillis();
+                PREVIEW.put(e.id, now + 15_000);
+                END.put(e.id, now + 15_000);
+                TOTAL.put(e.id, 15_000L);
             } else {
                 start(e, true);
             }
@@ -102,6 +153,7 @@ public class CooldownManager {
         TOTAL.clear();
         SPAWNED.clear();
         PENDING.clear();
+        PREVIEW.clear();
     }
 
     public static boolean isActive(String id) {

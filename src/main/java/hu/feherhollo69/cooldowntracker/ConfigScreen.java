@@ -11,7 +11,7 @@ import java.util.List;
 
 public class ConfigScreen extends Screen {
     private static final int TOP = 36;   // első sor y pozíciója
-    private static final int ROW = 22;   // sorok közti távolság
+    private static final int ROW = 21;   // sorok közti távolság
 
     private final Screen parent;
     private final List<ModConfig.Entry> entries = new ArrayList<>();
@@ -63,8 +63,14 @@ public class ConfigScreen extends Screen {
             }).dimensions(left + 150, y, 44, 20).build());
 
             TextFieldWidget f = new TextFieldWidget(this.textRenderer, left + 200, y, 50, 20, Text.literal(entry.label));
-            f.setTextPredicate(s -> s.matches("[0-9.,]{0,6}"));
-            f.setText(trim(entry.seconds));
+            if (entry.isEffect()) {
+                f.setTextPredicate(s -> true);
+                f.setText("auto");   // az idő a rajtad lévő hatásból jön
+                f.setEditable(false);
+            } else {
+                f.setTextPredicate(s -> s.matches("[0-9.,]{0,6}"));
+                f.setText(trim(entry.seconds));
+            }
             addDrawableChild(f);
             secFields.add(f);
             y += ROW;
@@ -107,7 +113,7 @@ public class ConfigScreen extends Screen {
         for (int i = 0; i < entries.size(); i++) {
             ModConfig.Entry e = entries.get(i);
             ctx.drawTextWithShadow(this.textRenderer, e.label, left, y + 6, 0xFF000000 | e.color);
-            ctx.drawTextWithShadow(this.textRenderer, "mp", left + 254, y + 6, 0xFFAAAAAA);
+            if (!e.isEffect()) ctx.drawTextWithShadow(this.textRenderer, "mp", left + 254, y + 6, 0xFFAAAAAA);
             y += ROW;
         }
         y += 6;
@@ -120,6 +126,7 @@ public class ConfigScreen extends Screen {
     private void applyFields() {
         ModConfig cfg = ModConfig.get();
         for (int i = 0; i < entries.size(); i++) {
+            if (entries.get(i).isEffect()) continue;
             try {
                 double v = Double.parseDouble(secFields.get(i).getText().replace(',', '.'));
                 entries.get(i).seconds = Math.max(0.5, Math.min(3600, v));

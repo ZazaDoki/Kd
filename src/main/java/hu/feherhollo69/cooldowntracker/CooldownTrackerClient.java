@@ -24,7 +24,7 @@ public class CooldownTrackerClient implements ClientModInitializer {
     public void onInitializeClient() {
         ModConfig.load();
 
-        // Jobb klikk (ender pearl, cukor, blaze powder, nyúlláb)
+        // Jobb klikk (ender pearl, nyúlláb, horgászbot)
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient()) {
                 CooldownManager.handle(player.getStackInHand(hand), "USE");
